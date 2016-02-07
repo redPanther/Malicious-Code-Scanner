@@ -44,6 +44,7 @@ class phpMalCodeScan {
 			$this->SEND_EMAILS = false;
 			$this->OUTPUT_ALERTS = true;
 		}
+
 		$this->scan( $this->CLI_MODE ? '.' : dirname(__FILE__) );
 		$this->sendalert();
 	}
@@ -71,6 +72,14 @@ class phpMalCodeScan {
 		$this->scanned_files[] = $file;
 		if ( preg_match('/<\?php/',$contents) == false)
 			return;
+
+		if ( substr($file,-4) == '.php' ) {
+			$mime = mime_content_type( $file);
+			$mime_a = explode('/',$mime);
+			if ( $mime_a[0] != "text" )
+				$this->infected_files[] = array('file' => $file, 'pattern_matched' => "suspicious mime type ($mime)");
+		}
+
 		foreach($this->scan_patterns as $pattern) {
 			if(preg_match($pattern,$contents)) {
 				if($file !== __FILE__) {
@@ -92,10 +101,9 @@ class phpMalCodeScan {
 			if($this->SEND_EMAILS)
 				mail($this->mail_addr,'Malicious Code Found!',$message,'FROM:');
 			if($this->OUTPUT_ALERTS) {
-				if (! $this->CLI_MODE ) {
+				if (! $this->CLI_MODE )
 					print( "<pre>" );
-					print( $message );
-				}
+				print( $message );
 			}
 		}
 	}
