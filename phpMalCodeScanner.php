@@ -73,18 +73,26 @@ class phpMalCodeScan {
 		if ( preg_match('/<\?php/',$contents) == false)
 			return;
 
-		if ( substr($file,-4) == '.php' ) {
-			$mime = mime_content_type( $file);
-			$mime_a = explode('/',$mime);
-			if ( $mime_a[0] != "text" )
-				$this->infected_files[] = array('file' => $file, 'pattern_matched' => "suspicious mime type ($mime)");
-		}
-
+		$infected = false;
 		foreach($this->scan_patterns as $pattern) {
 			if(preg_match($pattern,$contents)) {
 				if($file !== __FILE__) {
 					$this->infected_files[] = array('file' => $file, 'pattern_matched' => $pattern);
+					$infected = true;
 					break;
+				}
+			}
+		}
+
+		if ( substr($file,-4) == '.php' ) {
+			$mime = mime_content_type( $file);
+			$mime_a = explode('/',$mime);
+			if ( $mime_a[0] != "text" ) {
+				if ($infected) {
+					$pattern_desc = $this->infected_files[count($this->infected_files)-1]['pattern_matched'];
+					$this->infected_files[count($this->infected_files)-1]['pattern_matched'] = $pattern_desc." - suspicious mime ($mime)";
+				} else {
+					$this->infected_files[count($this->infected_files)-1]['pattern_matched'] = array('file' => $file, 'pattern_matched' => "suspicious mime type ($mime)");
 				}
 			}
 		}
@@ -107,8 +115,6 @@ class phpMalCodeScan {
 			}
 		}
 	}
-
-
 }
 
 
