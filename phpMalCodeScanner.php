@@ -10,9 +10,8 @@ Credits: Based on the idea of Er. Rochak Chauhan (http://www.rochakchauhan.com/)
 License: GPL-2
 */
 
-
 // Set to your email:
-define('SEND_EMAIL_ALERTS_TO','youremail@example.com');
+define('SEND_EMAIL_ALERTS_TO','');
 
 
 ############################################ START CLASS
@@ -21,23 +20,43 @@ define('SEND_EMAIL_ALERTS_TO','youremail@example.com');
 class phpMalCodeScan {
 
 	public $infected_files = array();
+	private $CLI_MODE = false;
+	private $OUTPUT_ALERTS = false;
+	private $SEND_EMAILS = false;
+	private $mail_addr = false;
+	
 	private $scanned_files = array();
-	
-	
-	function __construct() {
-		$this->scan(dirname(__FILE__));
+	private $scan_patterns = array(
+		'/if\(isset\($_GET\[[a-z][0-9][0-9]+/i',
+		'/eval\((base64|eval|\$_|\$\$|\$[A-Za-z_0-9\{]*(\(|\{|\[))/i',
+		'/eval\(\$_./i',
+		'/<\?php[ \t]+\$_([a-z0-9A-Z]+)=/',
+		'/;@ini/i',
+		'/.*ineedthispage.*DOORWAYISWORK/i',
+		'/.{300,}/i',
+	);
+
+
+	function __construct($mail_addr="") {
+		$this->CLI_MODE = (php_sapi_name() == "cli");
+		$this->mail_addr = $mail_addr;
+		if ( $this->CLI_MODE || empty($mail_addr) || ! $this->SEND_EMAILS) {
+			$this->SEND_EMAILS = false;
+			$this->OUTPUT_ALERTS = true;
+		}
+		$this->scan( $this->CLI_MODE ? '.' : dirname(__FILE__) );
 		$this->sendalert();
 	}
-	
-	
+
+
 	function scan($dir) {
 		$this->scanned_files[] = $dir;
 		$files = scandir($dir);
-		
+
 		if(!is_array($files)) {
 			throw new Exception('Unable to scan directory ' . $dir . '.  Please make sure proper permissions have been set.');
 		}
-		
+
 		foreach($files as $file) {
 			if(is_file($dir.'/'.$file) && !in_array($dir.'/'.$file,$this->scanned_files)) {
 				$this->check(file_get_contents($dir.'/'.$file),$dir.'/'.$file);
@@ -46,12 +65,19 @@ class phpMalCodeScan {
 			}
 		}
 	}
-	
-	
+
+
 	function check($contents,$file) {
 		$this->scanned_files[] = $file;
-		if(preg_match('/eval\((base64|eval|\$_|\$\$|\$[A-Za-z_0-9\{]*(\(|\{|\[))/i',$contents)) {
-			$this->infected_files[] = $file;
+		if ( preg_match('/<\?php/',$contents) == false)
+			return;
+		foreach($this->scan_patterns as $pattern) {
+			if(preg_match($pattern,$contents)) {
+				if($file !== __FILE__) {
+					$this->infected_files[] = array('file' => $file, 'pattern_matched' => $pattern);
+					break;
+				}
+			}
 		}
 	}
 
@@ -59,11 +85,14 @@ class phpMalCodeScan {
 	function sendalert() {
 		if(count($this->infected_files) != 0) {
 			$message = "== MALICIOUS CODE FOUND == \n\n";
-			$message .= "The following files appear to be infected: \n";
+			$message .= "The following ".count($this->infected_files)." files appear to be infected: \n";
 			foreach($this->infected_files as $inf) {
-				$message .= "  -  $inf \n";
+				$message .= "  -  ".$inf['file'] ."	 [".$inf['pattern_matched']."]\n";
 			}
-			mail(SEND_EMAIL_ALERTS_TO,'Malicious Code Found!',$message,'FROM:');
+			if($this->SEND_EMAILS)
+				mail($this->mail_addr,'Malicious Code Found!',$message,'FROM:');
+			if($this->OUTPUT_ALERTS)
+				print( $message );
 		}
 	}
 
@@ -75,7 +104,5 @@ class phpMalCodeScan {
 
 ini_set('memory_limit', '-1'); ## Avoid memory errors (i.e in foreachloop)
 
-new phpMalCodeScan;
+new phpMalCodeScan(SEND_EMAIL_ALERTS_TO);
 
-
-?>
