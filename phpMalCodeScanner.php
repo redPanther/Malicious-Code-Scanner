@@ -33,7 +33,7 @@ class phpMalCodeScan {
 		'/<\?php[ \t]+\$_([a-z0-9A-Z]+)=/',
 		'/;@ini/i',
 		'/.*ineedthispage.*DOORWAYISWORK/i',
-		'/.{300,}/i',
+		'/.{400,}/i',
 	);
 
 
@@ -91,8 +91,12 @@ class phpMalCodeScan {
 			}
 			if($this->SEND_EMAILS)
 				mail($this->mail_addr,'Malicious Code Found!',$message,'FROM:');
-			if($this->OUTPUT_ALERTS)
-				print( $message );
+			if($this->OUTPUT_ALERTS) {
+				if (! $this->CLI_MODE ) {
+					print( "<pre>" );
+					print( $message );
+				}
+			}
 		}
 	}
 
